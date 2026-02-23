@@ -1,0 +1,8 @@
+streamlit
+pandas
+rapidfuzz
+spacy
+easyocr
+openai-whisper
+speechrecognition
+pydub

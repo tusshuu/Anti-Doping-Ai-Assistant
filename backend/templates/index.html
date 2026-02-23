@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Anti-Doping AI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:'Poppins',sans-serif;
+}
+
+body{
+height:100vh;
+background:linear-gradient(135deg,#0a0f1c,#101a2e,#0a0f1c);
+display:flex;
+justify-content:center;
+align-items:center;
+overflow:hidden;
+color:white;
+}
+
+/* Animated moving background grid */
+body::before{
+content:"";
+position:absolute;
+width:200%;
+height:200%;
+background:radial-gradient(circle,rgba(0,255,200,0.15) 1px,transparent 1px);
+background-size:60px 60px;
+animation:moveBg 25s linear infinite;
+}
+
+@keyframes moveBg{
+from{transform:translate(0,0);}
+to{transform:translate(-300px,-300px);}
+}
+
+.container{
+position:relative;
+z-index:2;
+width:450px;
+padding:35px;
+background:rgba(255,255,255,0.05);
+backdrop-filter:blur(25px);
+border-radius:25px;
+box-shadow:0 0 50px rgba(0,255,200,0.3);
+text-align:center;
+animation:fadeIn 1.5s ease-in-out;
+}
+
+@keyframes fadeIn{
+from{opacity:0;transform:translateY(30px);}
+to{opacity:1;transform:translateY(0);}
+}
+
+h1{
+color:#00ffc8;
+margin-bottom:20px;
+}
+
+/* Upload Box */
+.upload-box{
+border:2px dashed #00ffc8;
+padding:25px;
+border-radius:15px;
+cursor:pointer;
+transition:0.3s;
+position:relative;
+overflow:hidden;
+}
+
+.upload-box:hover{
+background:rgba(0,255,200,0.1);
+transform:scale(1.05);
+}
+
+#preview{
+margin-top:15px;
+max-width:100%;
+border-radius:10px;
+display:none;
+}
+
+/* AI Scan line */
+.scan-line{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:4px;
+background:#00ffc8;
+animation:scan 2s infinite;
+display:none;
+}
+
+@keyframes scan{
+0%{top:0;}
+100%{top:100%;}
+}
+
+/* Mic Button */
+.mic-container{
+margin:20px 0;
+}
+
+.mic-btn{
+width:80px;
+height:80px;
+border-radius:50%;
+background:#00ffc8;
+border:none;
+font-size:30px;
+cursor:pointer;
+transition:0.3s;
+}
+
+.mic-btn.recording{
+background:red;
+animation:pulse 1s infinite;
+}
+
+@keyframes pulse{
+0%{box-shadow:0 0 0 0 rgba(255,0,0,0.7);}
+70%{box-shadow:0 0 0 25px rgba(255,0,0,0);}
+100%{box-shadow:0 0 0 0 rgba(255,0,0,0);}
+}
+
+/* Wave animation */
+.wave{
+display:flex;
+justify-content:center;
+gap:5px;
+margin-top:10px;
+display:none;
+}
+
+.wave span{
+width:5px;
+height:20px;
+background:#00ffc8;
+animation:waveAnim 1s infinite ease-in-out;
+}
+
+.wave span:nth-child(2){animation-delay:0.1s;}
+.wave span:nth-child(3){animation-delay:0.2s;}
+.wave span:nth-child(4){animation-delay:0.3s;}
+.wave span:nth-child(5){animation-delay:0.4s;}
+
+@keyframes waveAnim{
+0%,100%{height:20px;}
+50%{height:40px;}
+}
+
+.timer{
+margin-top:5px;
+font-size:14px;
+color:#aaa;
+}
+
+/* Analyze Button */
+.analyze-btn{
+margin-top:15px;
+padding:10px 25px;
+border:none;
+border-radius:20px;
+background:#00ffc8;
+color:black;
+font-weight:bold;
+cursor:pointer;
+transition:0.3s;
+}
+
+.analyze-btn:hover{
+transform:scale(1.1);
+}
+
+/* Progress Bar */
+.progress{
+width:100%;
+height:8px;
+background:#222;
+border-radius:10px;
+margin-top:15px;
+overflow:hidden;
+display:none;
+}
+
+.progress-bar{
+height:100%;
+width:0%;
+background:#00ffc8;
+transition:width 1.5s ease-in-out;
+}
+
+/* Result */
+.result{
+margin-top:20px;
+font-size:18px;
+font-weight:500;
+}
+
+.clean{color:#00ff88;}
+.suspicious{color:#ff3c3c;}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h1>Anti-Doping AI</h1>
+
+<div class="upload-box" id="uploadBox">
+<input type="file" id="imageInput" hidden>
+Drag or Click to Upload Image
+<div class="scan-line" id="scanLine"></div>
+<img id="preview">
+</div>
+
+<div class="mic-container">
+<button class="mic-btn" id="micBtn">🎤</button>
+
+<div class="wave" id="wave">
+<span></span><span></span><span></span><span></span><span></span>
+</div>
+
+<div class="timer" id="timer">00:00</div>
+</div>
+
+<button class="analyze-btn" id="analyzeBtn">Analyze</button>
+
+<div class="progress" id="progress">
+<div class="progress-bar" id="progressBar"></div>
+</div>
+
+<div class="result" id="result"></div>
+
+</div>
+
+<script>
+const micBtn = document.getElementById("micBtn");
+const wave = document.getElementById("wave");
+const timer = document.getElementById("timer");
+let seconds = 0;
+let interval;
+let recording = false;
+
+micBtn.addEventListener("click", () => {
+recording = !recording;
+micBtn.classList.toggle("recording");
+wave.style.display = recording ? "flex" : "none";
+
+if(recording){
+interval = setInterval(()=>{
+seconds++;
+let min = String(Math.floor(seconds/60)).padStart(2,'0');
+let sec = String(seconds%60).padStart(2,'0');
+timer.textContent = min + ":" + sec;
+},1000);
+}else{
+clearInterval(interval);
+seconds=0;
+timer.textContent="00:00";
+}
+});
+
+/* Image preview */
+const imageInput = document.getElementById("imageInput");
+const preview = document.getElementById("preview");
+const uploadBox = document.getElementById("uploadBox");
+
+uploadBox.addEventListener("click",()=>{
+imageInput.click();
+});
+
+imageInput.addEventListener("change",(e)=>{
+const file = e.target.files[0];
+if(file){
+preview.src = URL.createObjectURL(file);
+preview.style.display="block";
+}
+});
+
+/* Analyze Simulation */
+const analyzeBtn = document.getElementById("analyzeBtn");
+const progress = document.getElementById("progress");
+const progressBar = document.getElementById("progressBar");
+const result = document.getElementById("result");
+const scanLine = document.getElementById("scanLine");
+
+analyzeBtn.addEventListener("click",()=>{
+progress.style.display="block";
+scanLine.style.display="block";
+progressBar.style.width="100%";
+
+setTimeout(()=>{
+scanLine.style.display="none";
+let random = Math.random();
+if(random > 0.5){
+result.textContent="Status: CLEAN ✅ (Confidence 92%)";
+result.className="result clean";
+}else{
+result.textContent="Status: SUSPICIOUS ⚠ (Confidence 87%)";
+result.className="result suspicious";
+}
+},2000);
+});
+</script>
+
+</body>
+</html>
+
