@@ -14,7 +14,7 @@ def check_drugs(drug_names):
             category = row.iloc[0]["category"]
 
             results.append({
-                "substance": drug,
+                "medicine": drug,
                 "category": category,
                 "status": status
             })

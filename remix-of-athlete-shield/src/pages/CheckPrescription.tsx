@@ -31,52 +31,135 @@ const CheckPrescription = () => {
   const [results, setResults] = useState<CheckResult[]>([]);
   const [hasChecked, setHasChecked] = useState(false);
   const [aiExplanation, setAiExplanation] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [transcript, setTranscript] = useState("");
 
   const handleCheck = async () => {
-    if (!textInput.trim()) {
-      toast.error("Please enter medicine names or prescription text");
-      return;
+  if (!textInput.trim()) {
+    toast.error("Please enter medicine names or prescription text");
+    return;
+  }
+
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    toast.error("Please login again");
+    return;
+  }
+
+  try {
+    const response = await fetch("http://localhost:8000/check", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,   // ✅ THIS IS THE FIX
+      },
+      body: JSON.stringify({ text: textInput }),
+    });
+
+    if (!response.ok) throw new Error("Backend error");
+
+    const data = await response.json();
+    console.log("Backend response:", data);
+
+    setAiExplanation(data.ai_explanation || "");
+
+    if (Array.isArray(data.results) && data.results.length > 0) {
+      const formatted = data.results.map((item: any) => ({
+        medicine: item.medicine || item.name || "Unknown",
+        status:
+          item.status?.toLowerCase() === "banned"
+            ? "banned"
+            : item.status?.toLowerCase() === "safe"
+            ? "safe"
+            : "caution",
+        details: item.details || "No details provided.",
+      }));
+      setResults(formatted);
+    } else {
+      setResults([]);
     }
 
+    setHasChecked(true);
+  } catch (error) {
+    toast.error("Backend connection failed");
+    console.error(error);
+  }
+};
+
+  const handleImageUpload = async (file: File) => {
     try {
-      const response = await fetch("http://localhost:8000/check", {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("http://localhost:8000/check-image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: textInput }),
+        body: formData,
       });
 
       if (!response.ok) throw new Error("Backend error");
 
       const data = await response.json();
-      console.log("Backend response:", data);
+      console.log("OCR response:", data);
 
       setAiExplanation(data.ai_explanation || "");
 
-      if (Array.isArray(data.results) && data.results.length === 0) {
-        setResults([
-          {
-            medicine: textInput,
-            status: "safe",
-            details: data.message || "No banned substances detected.",
-          },
-        ]);
-      } else if (Array.isArray(data.results)) {
+      if (Array.isArray(data.results) && data.results.length > 0) {
         const formatted = data.results.map((item: any) => ({
-          medicine: item.medicine || item.name || "Unknown",
-          status: item.status || "caution",
-          bannedChemical: item.bannedChemical,
-          category: item.category,
+          medicine: item.medicine || "Unknown",
+          status:
+            item.status?.toLowerCase() === "banned"
+              ? "banned"
+              : item.status?.toLowerCase() === "safe"
+              ? "safe"
+              : "caution",
           details: item.details || "No details provided.",
         }));
         setResults(formatted);
+      } else {
+        setResults([]);
       }
 
       setHasChecked(true);
     } catch (error) {
-      toast.error("Backend connection failed");
+      toast.error("OCR backend connection failed");
       console.error(error);
     }
   };
+  const startRecording = () => {
+  const SpeechRecognition =
+    (window as any).SpeechRecognition ||
+    (window as any).webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    toast.error("Speech Recognition not supported in this browser");
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.start();
+  setIsRecording(true);
+
+  recognition.onresult = (event: any) => {
+    const speechText = event.results[0][0].transcript;
+    setTranscript(speechText);
+    setTextInput(speechText); // send voice text to textInput
+  };
+
+  recognition.onerror = () => {
+    toast.error("Voice recognition error");
+    setIsRecording(false);
+  };
+
+  recognition.onend = () => {
+    setIsRecording(false);
+  };
+};
 
   return (
     <div className="min-h-screen bg-background">
@@ -136,43 +219,97 @@ const CheckPrescription = () => {
             )}
 
             {mode === "image" && (
-              <div className="text-center py-10">
-                <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-4">
-                  Upload prescription image (AI backend required)
+              <div className="space-y-4 text-center py-6">
+                <Camera className="h-12 w-12 mx-auto text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Upload prescription image
                 </p>
                 <Input
                   type="file"
                   accept="image/*"
-                  onChange={() =>
-                    toast.info("Image OCR backend not yet implemented.")
-                  }
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setSelectedFile(file);
+                  }}
                 />
-              </div>
-            )}
-
-            {mode === "voice" && (
-              <div className="text-center py-10">
-                <Mic className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-4">
-                  Voice input requires speech-to-text backend.
-                </p>
                 <Button
-                  variant="outline"
-                  onClick={() =>
-                    toast.info("Voice backend not yet implemented.")
-                  }
+                  className="w-full"
+                  onClick={() => {
+                    if (!selectedFile) {
+                      toast.error("Please select an image first");
+                      return;
+                    }
+                    handleImageUpload(selectedFile);
+                  }}
                 >
-                  Start Recording
+                  <Search className="h-4 w-4 mr-2" />
+                  Analyze Image
                 </Button>
               </div>
             )}
+
+           {mode === "voice" && (
+  <div className="space-y-4 text-center py-6">
+
+    <Mic
+      className={`h-12 w-12 mx-auto ${
+        isRecording ? "text-red-500 animate-pulse" : "text-muted-foreground"
+      }`}
+    />
+
+    <p className="text-sm text-muted-foreground">
+      Click start and speak medicine names clearly.
+    </p>
+
+    <Button
+      variant={isRecording ? "destructive" : "default"}
+      onClick={startRecording}
+    >
+      {isRecording ? "Recording..." : "Start Recording"}
+    </Button>
+
+    {transcript && (
+      <div className="mt-4 p-4 border rounded-xl bg-muted text-left">
+        <p className="text-sm font-medium">Recognized Text:</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          {transcript}
+        </p>
+      </div>
+    )}
+
+    {transcript && (
+      <Button
+        className="w-full mt-3 gap-2"
+        onClick={handleCheck}
+      >
+        <Search className="h-4 w-4" />
+        Analyze Voice Input
+      </Button>
+    )}
+  </div>
+)}
           </div>
 
           {/* Results */}
-          {hasChecked && results.length > 0 && (
+          {hasChecked && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold">Analysis Results</h2>
+
+              {results.length === 0 && (
+                <div className="border rounded-xl p-5 bg-green-50 border-green-300">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="h-6 w-6 text-green-600" />
+                    <div>
+                      <h3 className="font-semibold">
+                        No banned substances detected
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        The prescription appears safe under WADA guidelines.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {results.map((r, i) => (
                 <div
@@ -209,7 +346,6 @@ const CheckPrescription = () => {
                 </div>
               ))}
 
-              {/* AI Explanation */}
               {aiExplanation && (
                 <div className="p-5 bg-blue-50 border border-blue-300 rounded-xl">
                   <h3 className="font-semibold text-blue-700 mb-2">

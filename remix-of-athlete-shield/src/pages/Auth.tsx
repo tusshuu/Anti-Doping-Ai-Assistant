@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { Shield, Mail, Phone, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,13 +23,65 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [selectedSport, setSelectedSport] = useState("");
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast.info(
-      "Authentication requires backend setup. Enable Lovable Cloud to activate login/signup with email verification."
-    );
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  console.log("SUBMIT WORKING");
+
+  try {
+    const endpoint = isLogin
+  ? "http://localhost:8000/login"
+  : "http://localhost:8000/register";
+
+    const bodyData = isLogin
+      ? {
+          email,
+          password,
+        }
+      : {
+          name,
+          email,
+          phone,
+          sport: selectedSport,
+          password,
+        };
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(bodyData),
+    });
+
+    const data = await response.json();
+    console.log("LOGIN RESPONSE:", data);
+
+    if (!response.ok) {
+      toast.error(data.detail || "Something went wrong");
+      return;
+    }
+
+    if (isLogin) {
+  console.log("LOGIN SUCCESS BLOCK ENTERED");
+
+  localStorage.setItem("token", data.access_token);
+  window.dispatchEvent(new Event("storage"));
+
+  console.log("TOKEN SAVED:", localStorage.getItem("token"));
+  console.log("Navigating to dashboard...");
+  
+  navigate("/dashboard");
+} else {
+      toast.success("Registration successful 🎉 Please login.");
+      setIsLogin(true);
+    }
+
+  } catch (error) {
+    toast.error("Server error. Make sure backend is running.");
+  }
+};
 
   return (
     <div className="min-h-screen bg-background">

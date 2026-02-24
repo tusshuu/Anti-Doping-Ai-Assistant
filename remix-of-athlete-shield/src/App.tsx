@@ -1,3 +1,4 @@
+import Dashboard from "./pages/Dashboard";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,6 +11,7 @@ import CheckPrescription from "./pages/CheckPrescription";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -19,6 +21,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/" element={<Index />} />
           <Route path="/banned-substances" element={<BannedSubstances />} />
           <Route path="/banned-medicines" element={<BannedMedicines />} />
